@@ -1,0 +1,42 @@
+[daemon]
+interval_ms = 1000
+status_path = "/run/nuc-powerd/status.json"
+
+[safety]
+critical_temp_c = 90.0
+panic_temp_c = 95.0
+sensor_stale_sec = 5
+rollback_on_error = true
+
+[hysteresis]
+warm_on_c = 72.0
+warm_off_c = 68.0
+hot_on_c = 80.0
+hot_off_c = 75.0
+critical_on_c = 88.0
+critical_off_c = 83.0
+min_dwell_sec = 20
+
+[state.cool]
+epp = "balance_performance"
+turbo = true
+max_freq_pct = 100
+rapl_pkg_w = 28
+
+[state.warm]
+epp = "balance_power"
+turbo = true
+max_freq_pct = 90
+rapl_pkg_w = 24
+
+[state.hot]
+epp = "power"
+turbo = false
+max_freq_pct = 70
+rapl_pkg_w = 17
+
+[state.critical]
+epp = "power"
+turbo = false
+max_freq_pct = 55
+rapl_pkg_w = 12
