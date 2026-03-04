@@ -16,6 +16,14 @@ pub struct Config {
 pub struct DaemonConfig {
     pub interval_ms: u64,
     pub status_path: String,
+    #[serde(default = "default_api_bind")]
+    pub api_bind: String,
+    #[serde(default = "default_control_path")]
+    pub control_path: String,
+    #[serde(default = "default_service_unit")]
+    pub service_unit: String,
+    #[serde(default = "default_stress_program")]
+    pub stress_program: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -64,6 +72,18 @@ pub fn validate_config(cfg: &Config) -> Result<()> {
     if cfg.daemon.interval_ms == 0 {
         return Err(anyhow!("daemon.interval_ms must be > 0"));
     }
+    if cfg.daemon.api_bind.trim().is_empty() {
+        return Err(anyhow!("daemon.api_bind must not be empty"));
+    }
+    if cfg.daemon.control_path.trim().is_empty() {
+        return Err(anyhow!("daemon.control_path must not be empty"));
+    }
+    if cfg.daemon.service_unit.trim().is_empty() {
+        return Err(anyhow!("daemon.service_unit must not be empty"));
+    }
+    if cfg.daemon.stress_program.trim().is_empty() {
+        return Err(anyhow!("daemon.stress_program must not be empty"));
+    }
     if cfg.safety.panic_temp_c <= cfg.safety.critical_temp_c {
         return Err(anyhow!(
             "safety.panic_temp_c must be > safety.critical_temp_c"
@@ -96,6 +116,22 @@ pub fn validate_config(cfg: &Config) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn default_api_bind() -> String {
+    "127.0.0.1:8788".to_string()
+}
+
+fn default_control_path() -> String {
+    "/run/nuc-powerd/control.json".to_string()
+}
+
+fn default_service_unit() -> String {
+    "nuc-powerd.service".to_string()
+}
+
+fn default_stress_program() -> String {
+    "stress-ng".to_string()
 }
 
 #[cfg(test)]
@@ -159,6 +195,10 @@ rapl_pkg_w = 12
         let cfg = load_config(&path).expect("load config");
         assert_eq!(cfg.state.hot.max_freq_pct, 70);
         assert_eq!(cfg.state.cool.epp, "balance_performance");
+        assert_eq!(cfg.daemon.api_bind, "127.0.0.1:8788");
+        assert_eq!(cfg.daemon.control_path, "/run/nuc-powerd/control.json");
+        assert_eq!(cfg.daemon.service_unit, "nuc-powerd.service");
+        assert_eq!(cfg.daemon.stress_program, "stress-ng");
     }
 
     #[test]
@@ -167,6 +207,10 @@ rapl_pkg_w = 12
             daemon: DaemonConfig {
                 interval_ms: 1000,
                 status_path: "/tmp/status.json".to_string(),
+                api_bind: "127.0.0.1:8788".to_string(),
+                control_path: "/run/nuc-powerd/control.json".to_string(),
+                service_unit: "nuc-powerd.service".to_string(),
+                stress_program: "stress-ng".to_string(),
             },
             safety: SafetyConfig {
                 critical_temp_c: 90.0,

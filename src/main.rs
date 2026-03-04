@@ -1,10 +1,13 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use nuc_powerd::actuators::SysfsActuator;
 use nuc_powerd::config::load_config;
+use nuc_powerd::control::{load_control_state, persist_control_state};
 use nuc_powerd::controller::Controller;
 use nuc_powerd::sensors::LinuxSensors;
 
@@ -55,18 +58,19 @@ fn run_controller(config_path: &Path, dry_run: bool) -> Result<()> {
     let status_path = cfg.daemon.status_path.clone();
     let interval_ms = cfg.daemon.interval_ms;
 
-    let mut controller = Controller::new(
-        cfg,
-        LinuxSensors::new(),
-        SysfsActuator::new(dry_run),
-        if dry_run { "dry-run" } else { "auto" },
-    )
-    .context("failed creating controller")?;
+    let control_path = PathBuf::from(&cfg.daemon.control_path);
+    let initial_control =
+        load_control_state(&control_path).context("failed loading control state")?;
+    persist_control_state(&control_path, &initial_control)
+        .context("failed persisting initial control state")?;
 
-    let running = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(true));
+    let mut controller = Controller::new(cfg, LinuxSensors::new(), SysfsActuator::new(dry_run))
+        .context("failed creating controller")?;
+
+    let running = Arc::new(AtomicBool::new(true));
     let r = running.clone();
     ctrlc::set_handler(move || {
-        r.store(false, std::sync::atomic::Ordering::SeqCst);
+        r.store(false, Ordering::SeqCst);
     })
     .context("failed setting signal handler")?;
 
@@ -76,11 +80,17 @@ fn run_controller(config_path: &Path, dry_run: bool) -> Result<()> {
         interval_ms
     );
 
-    while running.load(std::sync::atomic::Ordering::SeqCst) {
-        controller.tick().context("controller tick failed")?;
-        std::thread::sleep(std::time::Duration::from_millis(interval_ms));
-    }
+    let loop_result = (|| -> Result<()> {
+        while running.load(Ordering::SeqCst) {
+            controller.tick().context("controller tick failed")?;
+            std::thread::sleep(std::time::Duration::from_millis(interval_ms));
+        }
+        Ok(())
+    })();
 
+    running.store(false, Ordering::SeqCst);
+
+    loop_result?;
     println!("stopped. latest status: {status_path}");
     Ok(())
 }
@@ -110,6 +120,7 @@ fn doctor(config_path: &Path) -> Result<()> {
 
     println!("[doctor] config path: {}", config_path.display());
     println!("[doctor] status path: {}", cfg.daemon.status_path);
+    println!("[doctor] api bind: {}", cfg.daemon.api_bind);
 
     if let Some(parent) = Path::new(&cfg.daemon.status_path).parent() {
         if let Err(err) = fs::create_dir_all(parent) {
@@ -119,6 +130,17 @@ fn doctor(config_path: &Path) -> Result<()> {
             );
         } else {
             println!("[doctor] status dir ready: {}", parent.display());
+        }
+    }
+
+    if let Some(parent) = Path::new(&cfg.daemon.control_path).parent() {
+        if let Err(err) = fs::create_dir_all(parent) {
+            println!(
+                "[doctor] control dir create failed: {} ({err})",
+                parent.display()
+            );
+        } else {
+            println!("[doctor] control dir ready: {}", parent.display());
         }
     }
 

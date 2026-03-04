@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NUC Thermal Control</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="hero">
+        <p class="eyebrow">nuc-powerd local dashboard</p>
+        <h1>Thermal Control Console</h1>
+        <p class="subhead">
+          Live visibility into CPU thermal policy, actuator state, and control overrides.
+        </p>
+      </header>
+
+      <section class="grid status-grid">
+        <article class="card metric">
+          <p class="label">Mode</p>
+          <p id="mode" class="value">--</p>
+        </article>
+        <article class="card metric">
+          <p class="label">State</p>
+          <p id="state" class="value">--</p>
+        </article>
+        <article class="card metric">
+          <p class="label">Health</p>
+          <p id="health" class="value">--</p>
+        </article>
+        <article class="card metric">
+          <p class="label">CPU Temp</p>
+          <p id="temp_cpu_c" class="value">--</p>
+        </article>
+        <article class="card metric">
+          <p class="label">CPU Util</p>
+          <p id="cpu_util_pct" class="value">--</p>
+        </article>
+        <article class="card metric">
+          <p class="label">CPU Freq</p>
+          <p id="freq_mhz" class="value">--</p>
+        </article>
+        <article class="card metric">
+          <p class="label">Pkg Power</p>
+          <p id="pkg_power_w" class="value">--</p>
+        </article>
+        <article class="card metric">
+          <p class="label">Max Freq Cap</p>
+          <p id="max_freq_khz" class="value">--</p>
+        </article>
+      </section>
+
+      <section class="grid panel-grid">
+        <article class="card panel">
+          <h2>Live Trend</h2>
+          <div class="trend-stack">
+            <section class="trend-card">
+              <p class="trend-title">CPU Temp</p>
+              <canvas id="trend-temp" class="trend-canvas" width="800" height="100"></canvas>
+            </section>
+            <section class="trend-card">
+              <p class="trend-title">CPU Utilization</p>
+              <canvas id="trend-util" class="trend-canvas" width="800" height="100"></canvas>
+            </section>
+            <section class="trend-card">
+              <p class="trend-title">CPU Frequency & Cap</p>
+              <canvas id="trend-freq" class="trend-canvas" width="800" height="100"></canvas>
+            </section>
+          </div>
+          <p class="legend">
+            <span id="legend-temp" class="chip temp">Temp: -- C</span>
+            <span id="legend-util" class="chip util">CPU: -- %</span>
+            <span id="legend-freq" class="chip freq">Freq: -- GHz</span>
+            <span id="legend-cap" class="chip cap">Cap: -- GHz</span>
+          </p>
+          <p class="axis-note">Three separate graphs. Frequency and cap are in GHz. Window: last 90s.</p>
+        </article>
+
+        <article class="card panel">
+          <h2>Controls</h2>
+
+          <div class="mode-buttons">
+            <button data-mode="auto">Auto</button>
+            <button data-mode="eco">Eco</button>
+            <button data-mode="performance">Performance</button>
+            <button data-mode="paused">Paused</button>
+          </div>
+
+          <form id="override-form" class="form-row compact-3">
+            <label>
+              Override mode
+              <select id="override-mode">
+                <option value="auto">auto</option>
+                <option value="eco">eco</option>
+                <option value="performance">performance</option>
+                <option value="paused">paused</option>
+              </select>
+            </label>
+            <label>
+              TTL (sec)
+              <input id="override-ttl" type="number" min="1" max="86400" step="1" value="30" />
+            </label>
+            <button type="submit">Apply Override</button>
+          </form>
+
+          <form id="target-form" class="form-row compact-2">
+            <label>
+              Target temp (C)
+              <input id="target-temp" type="number" step="0.1" min="1" max="120" value="76.0" />
+            </label>
+            <button type="submit">Set Target</button>
+          </form>
+
+          <div class="service-block">
+            <h3>Daemon Service</h3>
+            <p id="service-state" class="service-state">Service: unknown</p>
+            <div class="service-buttons">
+              <button id="service-toggle" type="button">Start Service</button>
+              <button id="service-restart" type="button">Restart</button>
+            </div>
+            <p id="service-summary" class="service-summary">Service status: unknown</p>
+          </div>
+
+          <div class="test-block">
+            <h3>One-Click Validation</h3>
+            <div class="test-buttons">
+              <button id="test-baseline" type="button">Run Baseline Check</button>
+              <button id="test-stress" type="button">Run Stress Validation</button>
+            </div>
+            <p id="test-summary" class="test-summary">Validation: idle</p>
+          </div>
+
+          <div class="stress-block">
+            <h3>Stress Test</h3>
+            <form id="stress-form" class="form-row compact-4">
+              <label>
+                Duration (sec)
+                <input id="stress-duration" type="number" min="0" max="86400" step="1" value="0" />
+              </label>
+              <label>
+                Workers
+                <input id="stress-workers" type="number" min="1" max="512" step="1" value="1" />
+              </label>
+              <label>
+                CPU load (%)
+                <input id="stress-load" type="number" min="1" max="100" step="1" value="100" />
+              </label>
+              <button id="stress-toggle" type="submit">Start Stress Test</button>
+            </form>
+            <p class="hint">Set duration to 0 to keep stress running until you stop it.</p>
+            <p id="stress-summary" class="stress-summary">Stress status: unknown</p>
+          </div>
+
+          <div class="runtime-block">
+            <h3>Runtime Details</h3>
+            <dl class="details">
+              <dt>No Turbo</dt>
+              <dd id="no_turbo">--</dd>
+              <dt>Override Expires</dt>
+              <dd id="override_expires_ms">--</dd>
+              <dt>Target Temp</dt>
+              <dd id="target_temp_c">--</dd>
+              <dt>Last Update</dt>
+              <dd id="last_update_ms">--</dd>
+            </dl>
+            <p id="message" class="message">Waiting for first status sample...</p>
+            <p id="toast" class="toast" role="status" aria-live="polite"></p>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>

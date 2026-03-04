@@ -5,6 +5,10 @@ edition = "2021"
 license = "MIT"
 description = "Thermal-aware CPU policy daemon for Intel NUC systems"
 
+[features]
+default = []
+ui = ["dep:tiny_http"]
+
 [dependencies]
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
@@ -13,6 +17,13 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "=0.8.8"
 indexmap = "=2.2.6"
+fs2 = "0.4"
+tiny_http = { version = "0.12", optional = true }
 
 [dev-dependencies]
 tempfile = "=3.10.1"
+
+[[bin]]
+name = "nuc-powerd-ui"
+path = "src/bin/nuc-powerd-ui.rs"
+required-features = ["ui"]

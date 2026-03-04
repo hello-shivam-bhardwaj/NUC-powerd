@@ -5,14 +5,34 @@ After=multi-user.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/opt/nuc-powerd
 ExecStart=/usr/local/bin/nuc-powerd --config /etc/nuc-powerd.toml run
 Restart=always
 RestartSec=2
 NoNewPrivileges=true
+CapabilityBoundingSet=CAP_SYS_ADMIN CAP_DAC_OVERRIDE
 PrivateTmp=true
+PrivateDevices=true
+PrivateNetwork=true
 ProtectHome=true
-ReadWritePaths=/run/nuc-powerd
+ProtectHostname=true
+ProtectClock=true
+ProtectSystem=strict
+ProtectControlGroups=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectKernelTunables=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_UNIX
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+UMask=0077
+IPAddressDeny=any
+ReadWritePaths=/run/nuc-powerd /sys/devices/system/cpu /sys/class/powercap /sys/devices/virtual/powercap
 
 [Install]
 WantedBy=multi-user.target

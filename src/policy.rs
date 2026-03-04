@@ -2,7 +2,7 @@ use std::time::{Duration, Instant};
 
 use crate::config::HysteresisConfig;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ThermalState {
     Cool,
@@ -44,6 +44,10 @@ impl PolicyEngine {
 
     pub fn state(&self) -> ThermalState {
         self.state
+    }
+
+    pub fn set_thresholds(&mut self, thresholds: HysteresisConfig) {
+        self.thresholds = thresholds;
     }
 
     pub fn evaluate(&mut self, temp_c: f64, now: Instant) -> PolicyDecision {

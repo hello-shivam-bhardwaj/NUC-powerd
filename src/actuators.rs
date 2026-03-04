@@ -5,8 +5,18 @@ use anyhow::{Context, Result};
 
 use crate::config::StateProfile;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AppliedControls {
+    pub no_turbo: bool,
+    pub max_freq_khz: u64,
+}
+
 pub trait Actuator {
-    fn apply_profile(&mut self, profile: &StateProfile, rollback_on_error: bool) -> Result<()>;
+    fn apply_profile(
+        &mut self,
+        profile: &StateProfile,
+        rollback_on_error: bool,
+    ) -> Result<AppliedControls>;
 }
 
 pub struct SysfsActuator {
@@ -37,6 +47,7 @@ impl SysfsActuator {
             dry_run,
         }
     }
+
     pub fn with_paths(
         epp_path: PathBuf,
         max_freq_path: PathBuf,
@@ -57,13 +68,26 @@ impl SysfsActuator {
 }
 
 impl Actuator for SysfsActuator {
-    fn apply_profile(&mut self, profile: &StateProfile, rollback_on_error: bool) -> Result<()> {
+    fn apply_profile(
+        &mut self,
+        profile: &StateProfile,
+        rollback_on_error: bool,
+    ) -> Result<AppliedControls> {
         let mut rollback: Vec<(PathBuf, String)> = Vec::new();
+
+        let max_cap_raw = fs::read_to_string(&self.max_freq_cap_path)
+            .with_context(|| format!("failed reading {}", self.max_freq_cap_path.display()))?;
+        let max_cap_khz: u64 = max_cap_raw
+            .trim()
+            .parse()
+            .context("invalid cpuinfo_max_freq")?;
+        let requested_max_khz = (max_cap_khz * u64::from(profile.max_freq_pct)) / 100;
 
         let guarded_write = |path: &PathBuf,
                              value: String,
                              rollback: &mut Vec<(PathBuf, String)>,
-                             dry_run: bool|
+                             dry_run: bool,
+                             rollback_on_error: bool|
          -> Result<()> {
             if dry_run {
                 return Ok(());
@@ -71,8 +95,17 @@ impl Actuator for SysfsActuator {
             if !path.exists() {
                 return Ok(());
             }
-            let old = fs::read_to_string(path).unwrap_or_default();
-            rollback.push((path.clone(), old));
+            if rollback_on_error {
+                match fs::read_to_string(path) {
+                    Ok(old) => rollback.push((path.clone(), old)),
+                    Err(err) => {
+                        eprintln!(
+                            "warning: failed reading rollback snapshot {}: {err}",
+                            path.display()
+                        );
+                    }
+                }
+            }
             fs::write(path, value).with_context(|| format!("failed writing {}", path.display()))?;
             Ok(())
         };
@@ -83,20 +116,15 @@ impl Actuator for SysfsActuator {
                 format!("{}\n", profile.epp),
                 &mut rollback,
                 self.dry_run,
+                rollback_on_error,
             )?;
 
-            let max_cap_raw = fs::read_to_string(&self.max_freq_cap_path)
-                .with_context(|| format!("failed reading {}", self.max_freq_cap_path.display()))?;
-            let max_cap_khz: u64 = max_cap_raw
-                .trim()
-                .parse()
-                .context("invalid cpuinfo_max_freq")?;
-            let requested = (max_cap_khz * u64::from(profile.max_freq_pct)) / 100;
             guarded_write(
                 &self.max_freq_path,
-                format!("{}\n", requested),
+                format!("{}\n", requested_max_khz),
                 &mut rollback,
                 self.dry_run,
+                rollback_on_error,
             )?;
 
             let no_turbo = if profile.turbo { "0\n" } else { "1\n" };
@@ -105,6 +133,7 @@ impl Actuator for SysfsActuator {
                 no_turbo.to_string(),
                 &mut rollback,
                 self.dry_run,
+                rollback_on_error,
             )?;
 
             if let Some(watts) = profile.rapl_pkg_w {
@@ -114,6 +143,7 @@ impl Actuator for SysfsActuator {
                     format!("{}\n", microwatts),
                     &mut rollback,
                     self.dry_run,
+                    rollback_on_error,
                 )?;
             }
 
@@ -122,11 +152,20 @@ impl Actuator for SysfsActuator {
 
         if result.is_err() && rollback_on_error && !self.dry_run {
             for (path, value) in rollback.into_iter().rev() {
-                let _ = fs::write(path, value);
+                if let Err(err) = fs::write(&path, value) {
+                    eprintln!(
+                        "warning: rollback write failed for {}: {err}",
+                        path.display()
+                    );
+                }
             }
         }
 
-        result
+        result?;
+        Ok(AppliedControls {
+            no_turbo: !profile.turbo,
+            max_freq_khz: requested_max_khz,
+        })
     }
 }
 
@@ -162,12 +201,14 @@ mod tests {
             rapl_pkg_w: Some(15),
         };
 
-        act.apply_profile(&profile, true).expect("apply");
+        let applied = act.apply_profile(&profile, true).expect("apply");
 
         assert_eq!(
             fs::read_to_string(&max_freq).expect("read max freq").trim(),
             "2000000"
         );
+        assert!(applied.no_turbo);
+        assert_eq!(applied.max_freq_khz, 2_000_000);
     }
 
     #[test]
@@ -194,10 +235,12 @@ mod tests {
             rapl_pkg_w: Some(12),
         };
 
-        act.apply_profile(&profile, true).expect("apply");
+        let applied = act.apply_profile(&profile, true).expect("apply");
         assert_eq!(
             fs::read_to_string(&epp).expect("read epp").trim(),
             "balance_performance"
         );
+        assert!(applied.no_turbo);
+        assert_eq!(applied.max_freq_khz, 1_600_000);
     }
 }

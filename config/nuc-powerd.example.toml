@@ -1,6 +1,10 @@
 [daemon]
 interval_ms = 1000
 status_path = "/run/nuc-powerd/status.json"
+api_bind = "127.0.0.1:8788"
+control_path = "/run/nuc-powerd/control.json"
+service_unit = "nuc-powerd.service"
+stress_program = "stress-ng"
 
 [safety]
 critical_temp_c = 90.0

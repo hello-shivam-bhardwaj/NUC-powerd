@@ -1,6 +1,10 @@
 pub mod actuators;
+#[cfg(feature = "ui")]
+pub mod api;
 pub mod config;
+pub mod control;
 pub mod controller;
+pub mod io;
 pub mod policy;
 pub mod sensors;
 pub mod status;
