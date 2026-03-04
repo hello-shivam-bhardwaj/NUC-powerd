@@ -41,6 +41,7 @@ The project is now split into:
 - `docs/SERVICE_INSTALL_AND_VALIDATION.md`: service install + validation runbook
 - `scripts/install.sh`: build/install/start helper
 - `scripts/install_service_hardened.sh`: hardened service installer (recommended)
+- `scripts/install_fleet_remote.sh`: multi-robot SSH deployment helper
 - `scripts/validate_system.sh`: end-to-end service validator
 - `scripts/uninstall.sh`: remove helper
 - `scripts/characterize_daemon.sh`: reproducible footprint profiling
@@ -232,6 +233,26 @@ Behavior notes:
 ./scripts/install.sh --with-ui
 
 sudo systemctl status nuc-powerd.service --no-pager
+```
+
+Fleet rollout (multiple robots over SSH):
+
+```bash
+# 1) copy and edit inventory
+cp scripts/robots.inventory.example /tmp/robots.inventory
+
+# 2) deploy to all inventory hosts
+./scripts/install_fleet_remote.sh --inventory /tmp/robots.inventory
+```
+
+Safe canary rollout pattern:
+
+```bash
+# install files only on fleet (do not start service yet)
+./scripts/install_fleet_remote.sh --inventory /tmp/robots.inventory --no-enable
+
+# on one canary robot, start + validate manually first
+ssh hello-robot@10.1.10.21 "sudo systemctl enable --now nuc-powerd.service && cd ~/nuc-powerd && ./scripts/validate_system.sh"
 ```
 
 Validate running system:

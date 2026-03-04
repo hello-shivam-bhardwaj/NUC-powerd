@@ -1,0 +1,7 @@
+# name|host|user|port|identity_file
+# user, port, and identity_file are optional.
+# identity_file is a local path on the machine running install_fleet_remote.sh.
+
+stretch-a|10.1.10.21|hello-robot|22|~/.ssh/stretch_a
+stretch-b|10.1.10.22|hello-robot|22|~/.ssh/stretch_b
+stretch-c|10.1.10.23|||
