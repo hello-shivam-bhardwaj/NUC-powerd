@@ -1,18 +1,18 @@
 [Unit]
 Description=NUC Power Optimization Daemon
-After=network.target
+After=multi-user.target
 
 [Service]
 Type=simple
 User=root
 WorkingDirectory=/opt/nuc-powerd
-ExecStart=/usr/local/bin/nuc-powerd --config /etc/nuc-powerd.toml
+ExecStart=/usr/local/bin/nuc-powerd --config /etc/nuc-powerd.toml run
 Restart=always
 RestartSec=2
 NoNewPrivileges=true
 PrivateTmp=true
-ProtectSystem=full
 ProtectHome=true
+ReadWritePaths=/run/nuc-powerd
 
 [Install]
 WantedBy=multi-user.target
