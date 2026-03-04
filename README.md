@@ -39,6 +39,7 @@ The project is now split into:
 - `config/nuc-powerd.example.toml`: Intel NUC baseline profile
 - `packaging/nuc-powerd.service`: systemd unit
 - `docs/SERVICE_INSTALL_AND_VALIDATION.md`: service install + validation runbook
+- `docs/STRETCH_BODY_II_ADOPTION_PLAN.md`: staged adoption/safety plan for integrating into `stretch_body_ii`
 - `scripts/install.sh`: build/install/start helper
 - `scripts/install_service_hardened.sh`: hardened service installer (recommended)
 - `scripts/install_fleet_remote.sh`: multi-robot SSH deployment helper
